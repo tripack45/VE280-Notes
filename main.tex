@@ -1,0 +1,44 @@
+\documentclass[slidestop,compress,mathserif]{beamer}
+\mode<presentation>
+
+\usepackage[outputdir=build]{minted}
+\usepackage{latexsym}
+\usepackage{menukeys}
+
+\usepackage{tikz}
+\usetikzlibrary{shapes,arrows}
+
+%\usepackage[bars]{beamerthemetree} % Beamer主题样式v 2.2
+\usetheme{Antibes} % Beamer主题样式v 3.0
+\usecolortheme{lily} % Beamer颜色主题样式
+
+\AtBeginSubsection[]{
+	\begin{frame}
+	\vfill
+	\centering
+	\begin{beamercolorbox}[sep=8pt,center,shadow=true,rounded=true]{title}
+		\insertsectionhead\newline\newline\usebeamerfont{title}\insertsubsectionhead\par%
+	\end{beamercolorbox}
+	\vfill
+	\end{frame}
+}
+
+\title{VE280 Recitation Class Notes}
+\author{YAO Yue}
+\institute{VE280 SU17 TA Group}
+\begin{document}
+	\begin{frame} % Cover slide
+	\titlepage
+	\end{frame}
+	
+	\begin{frame}
+		\frametitle{Table Of Contents}
+		\tableofcontents
+	\end{frame}
+
+	\include{week2}
+
+
+
+	
+\end{document}
