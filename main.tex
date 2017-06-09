@@ -1,10 +1,17 @@
 \documentclass[slidestop,compress,mathserif]{beamer}
 \mode<presentation>
-
+\beamertemplatenavigationsymbolsempty
+\addtobeamertemplate{navigation symbols}{}{%
+	\usebeamerfont{footline}%
+	\usebeamercolor[fg]{footline}%
+	\hspace{5em}%
+	\textbf{\insertframenumber/\inserttotalframenumber}
+}
 \usepackage[outputdir=build]{minted}
 \usepackage{latexsym}
 \usepackage{menukeys}
 \usepackage{bytefield}
+\usepackage{textcomp}
 
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows}
@@ -40,7 +47,7 @@
 	\end{frame}
 
 	\include{week2}
-	
 	\include{week3}
+	\include{week4}
 
 \end{document}

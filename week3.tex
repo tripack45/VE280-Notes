@@ -335,6 +335,21 @@ Once upon the time, programming languages are just conventions, design choices m
 The latest standard is C++17 (3/21/2017). Major standards are C++98, C++03, C++11, C++14. C++ after C++11 is generally considered ``modern C++". 
 \end{frame}
 
+\begin{frame}{Online reference for \texttt{std::to\_string()}}
+The following information comes from \texttt{http://www.cplusplus.com/reference/string/to\_string/}
+\begin{figure}
+	\centering
+	\includegraphics[scale=0.4]{fig/rc3_tostring}
+	\caption{Online reference for \texttt{C++11} library function \texttt{to\_string}}
+	\vspace{-0.2in}
+\end{figure}
+
+\begin{itemize}
+	\item Notice the \texttt{C++11} sign.
+	\item Notice the overloads supported by this function.
+\end{itemize}
+\end{frame}
+
 \begin{frame}{\textit{Undefined Behaviors}}
 One outcome from the standardize process is that, almost every true-or-false question about the C++ program can be answered with one of the following decisively. It is either YES, NO, or more importantly \textbf{undefined behavior} (\textit{UB} for short).
 
@@ -345,6 +360,7 @@ Undefined behaviors are program whose output depends on a specific platform, or 
 	\item Anyone who test you with UB, is both stupid and ignorant.
 \end{itemize}
 
+There is a reason why UB exists. It's not that the committee doesn't know how to eliminate them, but they leave room for pretty impressive \textit{compiler optimizations}.
 \end{frame}
 
 \begin{frame}{Undefined Behaviors}
@@ -365,12 +381,12 @@ Any (zero or more) of the following may happen if you trigger any of undefined b
 \end{frame}
 
 \begin{frame}[fragile]{Undefined Behaviors}
-\framesubtitle{Common cases}
+\framesubtitle{dCommon cases}
 
 
-- Integer overflow (No, it's not guaranteed to be zero!)
+- Integer overflow (No, it's not guaranteed to be negative!)
 \begin{minted}{c++}
-unsigned x = UINT_MAX; x++;
+int x = INT_MAX; x++; 
 \end{minted}
 
 - Dereferencing \texttt{nullptr} (No, it's not guaranteed to be crash!)
@@ -380,14 +396,14 @@ int* x = nullptr; *x = 2;
 
 - Array out-of-bound (Even taking address is UB!)
 \begin{minted}{c++}
-int x[10] = {0};  x[10] = 1; int* x = &(x[10]);
+int x[10] = {0};  x[10] = 1; int* x = &(x[11]);
 \end{minted}
 
 
 
 - Dangling references (You could still get correct value)
 \begin{minted}{c++}
-int* x = int[10]; x[3] = 5; delete[] x; cout << *x; 
+int* x = int[10]; x[3] = 5; delete[] x; cout << x[3]; 
 int* f(int t) {return &t;} int* x = f(10); cout << *x;
 \end{minted}
 
@@ -422,13 +438,13 @@ A declaration for a function is called a function prototype. The ``type" of a fu
 
 How much information do you need to describe the function?
 \begin{itemize}
-	\item The name, we need to be able to reference to that function
+	\item The name, we need to be able to refer to that function
 	\item Return type, the ``codomain" of the function.
 	\item Number of inputs and their type. ``domain" of the function.
 	\item Formal parameter name.
 \end{itemize}
 
-Combining them, the standard form of a function definition will be:
+Combining them, the standard form of a function declaration will be:
 \begin{minted}{c++}
 ReturnType functionName(T1 arg1, T2 arg2, ...);
 \end{minted}
@@ -508,8 +524,8 @@ int g(int& x) { return (x = 2);}
 
 We give the following code to demonstrate their difference:
 \begin{minted}{c++}
-int y = 10; f(y); cout << y; // outputs 10
-int y = 10; g(x); cout << y; // outputs 2
+int y = 10; f(y); cout << y; // returns 2, outputs 10
+int z = 10; g(z); cout << z; // returns 2, outputs 2
 \end{minted}
 From a language point of view, reference parameter allows the function to change the input parameter. 
 
@@ -517,7 +533,7 @@ Some would argue there exists a third way of argument passing.
 \begin{minted}{c++}
 #define SQR(x) (x * x)
 \end{minted}
-They have a point. We sometimes call this pass-by-name. But we choose to ignore that in this course.
+They have a point. We call this pass-by-name. But we choose to ignore that in this course.
 
 \end{frame}
 
@@ -691,7 +707,7 @@ You might need to specify \texttt{-std=c++11} when using these initializations.
 Now think about it, how to initialize \texttt{S sarr[2];}?
 
 	\column{.5\textwidth}
-	\structure{Curly-braced initializer}
+	\structure{Curly-brace enclosed initializer}
 \begin{minted}{c++}
 S s1 = {1, 2, 3, 4, 1.0};
 S s2 = {1, 2, {3, 4}, 1.0};
@@ -731,9 +747,54 @@ Now two functions are functionally same, which should I perfer?
 	\item Pro-ptr: References are used like values, not intuitive. Readers of the code has to jump to decl. Example \texttt{std::getline}.
 	\item Pro-ref: Pointers are easily confused with array.
 	\item Pro-ptr: Pointers are the only way to work with array. (If you ignore \texttt{std::vector}).
-	
 \end{itemize}
-
-
-
 \end{frame}
+
+\begin{frame}{References as an abstraction}
+We would like to quote the following words from the standard:
+\begin{quotation}
+	References are not objects; they do not necessarily occupy storage, although the compiler may allocate storage if it is necessary to implement the desired semantics.
+\end{quotation}
+In this way references are kind of special, since all usual types are connected to some memory: an \texttt{int} is 4 bytes and there is a 32-bit binary value in those 4 bytes. Pointer are addresses, they occupies 4 bytes in the memory and there is a 32-bit address in those 4 bytes. 
+
+Reference is defined through \textit{abstraction}: We have a contract with the language on how this thing should behave, but we make no assumption on how the compiler achieve such effect. Compiler could choose to use pointers to achieve references, but on the other hand it doesn't have to. 
+\end{frame}
+
+\begin{frame}[fragile]{Size of a reference type}
+\begin{itemize}
+	\item References are often implemented by pointers.
+	\item Now what is the size of the reference type.
+\end{itemize}
+Now \texttt{sizeof(int\&)} will not work. Std. requires \texttt{sizeof} the reference type returns \texttt{sizeof} the referenced type, \texttt{sizeof(int)}.
+
+But we could try
+\begin{minted}{c++}
+struct S {int x; int& y;} cout << sizeof(S);
+\end{minted}
+Will this work? Consider the code on the left side. Output?
+\vspace{-0.15in}
+\begin{columns}
+	\column{.5\textwidth}
+\begin{minted}{c++}
+struct S {int x; int& y};
+int main() {
+    int a = 3;
+    S s = {a, a};
+    cout << sizeof(s);
+} 
+\end{minted}
+	\column{.5\textwidth}
+	
+	\structure{It could be 8}
+	
+	Implemented by pointers, 4 bytes.
+	
+	\structure{It could be 4}
+	
+	Compiler discovered it is not used. This also obeys the std.
+	
+	\structure{It could be 5, 6, 7, 9, 120. Why?}
+\end{columns}
+\end{frame}
+
+

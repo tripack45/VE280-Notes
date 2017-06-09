@@ -1,0 +1,540 @@
+\section{RC Week 4}
+\subsection{Deciphering Type Declarations}
+\begin{frame}{Design choice of declarations.}
+\begin{block}{Quote from \textit{The C Progamming Language}}
+	\begin{quotation}
+		The syntax is an attempt to make the declaration and the use agree. (In it) ... parentheses are over-used.
+	\end{quotation}
+\end{block}
+\vspace{-.35in}
+\begin{columns}
+	\column[]{.33\textwidth}
+	\begin{block}{Declaration}
+		\begin{itemize}
+			\item \texttt{int a;}
+			\item \texttt{int arr[4];}
+			\item \texttt{int *p;}
+			\item \texttt{int *(pa[4]);\newline}
+			\item \texttt{int (*pp)[4];}
+		\end{itemize}
+	\end{block}
+	\column[]{.67\textwidth}
+	\begin{block}{Intepretation}
+		\begin{itemize}
+			\item \texttt{a} is an \texttt{int}
+			\item \texttt{arr[]}\textrightarrow \texttt{int}, \texttt{arr}\textrightarrow array of \texttt{int}
+			\item  \texttt{*p}\textrightarrow \texttt{int}, \texttt{p} \textrightarrow pointer to \texttt{int}
+			\item \texttt{*(pa[4])}\textrightarrow \texttt{int}, \texttt{pa[4]}\textrightarrow pointer to \texttt{int},  \texttt{pa}\textrightarrow array of pointer to \texttt{int}.
+			\item \texttt{*pp} \textrightarrow array of \texttt{int}, \texttt{pp} \textrightarrow pointer to array of \texttt{int}.
+		\end{itemize}
+	\end{block}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{const} modifier}
+Whenever a type something is \texttt{const} modified, it is declared as ``immutable". Example:
+
+\begin{minted}{c++}
+const int a = 10; a = 2; // Compile error
+struct P {int x = 1, y = 2;};
+const P p; p.y = 3; // Compile error
+\end{minted}
+
+Remember this immutability is enforced by the compiler at compile time. This has a very strong implication. The compiler does NOT forbid you from doing strange things intentionally.
+
+\begin{minted}{c++}
+const int a = 10; 
+int *p = const_cast<int*>(&a); // C++11 style cast
+*p = 20; cout << a; // Will this output 20?
+\end{minted}
+
+Well this is actually UB. \texttt{const} is not a guarantee of immutability, it is an \textbf{intention}. It asks the compiler to look out for you, if you know you shouldn't change something.
+\end{frame}
+
+\begin{frame}{\texttt{const} and pointers}
+	We now combine the previous discussions. 
+	
+	\begin{description}[\texttt{int *(const p)}]
+		\item[\texttt{const int *p}] \texttt{*p} is of type \texttt{const int}, thus changing \texttt{*p} is illegal. However this declaration does \textbf{not} say anything about \texttt{p}, thus changing \texttt{p} is possible. 
+		
+		This is called \textit{pointer-to-const}.
+		
+		\item[\texttt{int *const p}] Equivalent to \texttt{int *(const p)}.
+		\item[\texttt{int *(const p)}] This declaration essentially says if you dereference \texttt{const p}, you will get \texttt{int}. Since \texttt{int} is not quantified by \texttt{const}, you can change \texttt{*p}. However, the pointer itself, is modified by \texttt{const}, so you can change \texttt{p}.
+		
+		This is called \textit{const-pointer}.
+	\end{description}
+	
+	Naturally you could have \texttt{const int *(const p)}. This declaration basically says both the pointer \texttt{p} itself and the dereferenced object (\texttt{const int}) cannot be changed.
+\end{frame}
+
+\begin{frame}{\texttt{const} and reference}
+Recall that \textbf{references cannot be rebind once initialized}. The following definitions are equivalent. They are all \textit{const references}.
+
+\begin{itemize}
+	\item \texttt{const int\& iref}
+	\item \texttt{(const int)\& iref}
+	\item \texttt{int\& (const iref)}
+	\item \texttt{const int\& (const iref)}
+\end{itemize}
+
+The second one makes the most sense, although the first one is the most commonly used. 
+
+The second one essentially says,\texttt{iref} is a reference, or an alias to a memory region, that is protected by the \texttt{const} modifier. 
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{const} reference and argument passing}
+There is something special about const references:
+\begin{center}
+	\structure{Const reference are allowed to be bind to right values,\\ while normal references are not allowed to.}
+\end{center}
+Normally if a const reference is bind to a right value, the const reference is no difference to a simple const. 
+\begin{minted}{c++}
+int a=5; const int& r=a+1; const int c=a+1;
+\end{minted}
+In above example practically there is no difference between \texttt{r} and \texttt{c}.
+
+But when you pass arguments through const references, things become a little bit different.
+\begin{minted}{c++}
+int foo(const ReallySuperLargeStruct& s);
+\end{minted}
+\vspace{-0.05in}
+\begin{itemize}
+	\item We are passing by reference, this avoids copying.
+	\item \texttt{const} enforces immutability.
+	\item \texttt{rval}s can be passed directly into it (unlike pointers).
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Example}
+\begin{columns}
+	\column{.5\textwidth}
+\begin{minted}{c++}
+int foo(int); int bar(int&);
+int baz(const int&);
+
+int q = 10; int& rq = q;
+const int& crq = q;
+int* pq = &q; 
+const int* cpq = &q;
+
+void foobar() {
+    crq = 5;   // Error!
+    *cpq = 20; // Error!
+    q = 30; cout << crq;  // 30
+    *pq = 4; cout << *cpq // 4
+}
+\end{minted}
+	\column{.5\textwidth}
+\begin{minted}{c++}
+int bazbok() {
+    baz(q);   baz(20); // OK
+    baz(*pq); baz(rq); // OK
+	
+    bar(q);   bar(*pq); // OK
+    bar(10);   // ERROR
+    bar(*cpq); // ERROR
+    bar(crq)   // ERROR
+}
+\end{minted}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{const} propagation and type coercion}
+
+\begin{block}{Type coercion and type compatibility}
+	You should be very familiar with types now. Types defines different kinds of things. Some of those things are \textit{compatible}, meaning one could be transformed into another implicitly. But sometimes you need to explicitly \textit{cast} them, or coerce them into another type.
+		
+\begin{minted}{c++}
+int x = 20; long int y = 30; char* p = "hello";
+y = x; /* OK */ x = y; // Compiler warning
+int x = p; // Incompatible, compile error
+\end{minted} 
+\end{block}
+
+	A remark is that most of the things are incompatible, simply because these different type are different from the hardware point of view. Pointers are addresses, but int are number. \texttt{long int} occupies more space than \texttt{int} etc.
+	
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{const} propagation and type coercion}
+\framesubtitle{\texttt{const} modifier introduce incompatibility}
+
+	The subtitle is summarized into the following rules:
+	
+	\begin{itemize}
+		\item \texttt{const type\&} to \texttt{type\&} is \textbf{incompatible}.
+		\item \texttt{const type*} to \texttt{type*} is incompatible.
+		\item \texttt{type\&} to \texttt{const type\&} is \textbf{compatible}.
+		\item \texttt{type*} to \texttt{const type*} is compatible.
+	\end{itemize}
+Example:
+\begin{minted}{C++}
+int foo(int& x); int bar(int* px); int cfoo(const int& x);
+void baz() {
+   const int *q = nullptr; int *p = q; //Compile error
+   const int& r = 10;  foo(r); //Compile error
+   cfoo(*p); cfoo(*q); cfoo(r); // All OK
+}
+\end{minted}
+
+\end{frame}
+
+
+
+\begin{frame}[fragile]{\texttt{const} propagation and type coercion}
+\framesubtitle{\texttt{const} progagation}
+Further more, \texttt{const} modifier attaches extra constrain when trying to take address or dereference / reference things.
+
+\begin{itemize}
+\item Take address of the \texttt{const} references gives pointer-to-const.
+\item Dereferences pointer-to-const give const references.
+\end{itemize}
+Example:
+\begin{minted}{C++}
+int foo(int& x); int bar(int* px); int cfoo(const int& x);
+void baz() {
+    const int q = nullptr; int *p = &q; //Compile error
+    foo(q); bar(&q)                     //Compile error
+    const int& r = q; foo(r); bar(&r); // Compile errer
+}
+\end{minted}
+This creates an important feature of C++ \texttt{const}ness:
+
+ \structure{You either do it in full scale, or not at all}.
+\end{frame}
+
+\begin{frame}{\texttt{const} compatibility in terms of abstraction}
+\small
+Again I hope you could see something bigger. These rules are unlike those mentioned earlier. The compiler probably use the same representation for \texttt{type*} and\texttt{const type*}. 
+
+They are different, because they follow different abstraction. The abstraction for \texttt{type*} supports modification, or it is supported to appear on the left hand side of the assignment operator, while the abstraction of \texttt{const type*} does not. 
+
+This point of view also explains the propagation rules. The type system must be designed in a coherent way. If an object doesn't support modification, changing the reference to pointer won't suddenly equip it with modification. The abstraction must be maintained between operations.
+
+This gives a very first look over the abstraction point of view of the concept ``datatype". Now we see that datatype not just the memory layout of objects, but more about abstraction, operations that the type supports.
+
+\end{frame}
+
+
+
+\begin{frame}{Functions Pointers: Why Pointers?}
+
+	\structure{The Von Neumann View of functions}
+	
+	Functions are code, and code when compiled are simply binary number, i.e. data. The action of calling a function is simply pumping these binary numbers into the CPU (after you take VE370 you would find it's actually the other way around).
+	
+	\begin{itemize}
+		\item Functions are just a bunch of numbers in the memory
+		\item We could refer to the function by refering to the numbers
+		\item These numbers has an \textit{address} (think of arrays)
+		\item We could use that address to refer to the function
+	\end{itemize}
+	
+	Variable that stores the address of functions are called \textit{function pointers}. By passing them around we could pass functions into functions, return them from functions, and assign them to variables. 
+\end{frame}
+
+\begin{frame}{Functions Pointers: Type}
+But there is one question, what is the type of them? 
+
+Well by our previous understanding dereferencing a function pointer should give us a function, just like dereferencing \texttt{int*} gives us \texttt{int}. We would like to do a comparison:
+
+\vspace{-.2in}
+\begin{columns}
+	\column[]{.5\textwidth}
+	\begin{block}{Function decl. \texttt{foo}}
+		\begin{itemize}
+			\item \texttt{void foo();}
+			\item \texttt{int foo(int x, int y);}
+			\item \texttt{int foo(int, int);}
+			\item \texttt{int *foo(int, char*);}
+			\item \texttt{char* foo(int[], int);}
+		\end{itemize}
+	\end{block}
+	\column[]{.6\textwidth}
+	\begin{block}{Function pointer \texttt{bar}}
+		\begin{itemize}
+			\item \texttt{void (*bar)();}
+			\item \texttt{int (*bar)(int, int);}
+			\item \texttt{int (*bar)(int, int);}
+			\item \texttt{int *(*bar)(int, char*);}
+			\item \texttt{char *(*bar)(int[], int);}.
+		\end{itemize}
+	\end{block}
+\end{columns}
+Note \texttt{int *bar(int);} does \textbf{NOT} declare a function pointer. The grouping is \texttt{int *(bar(int))}, which is declaring a function. This is related to the operator precedence of C++.
+\end{frame}
+
+\begin{frame}[fragile]{Functions Pointers: Usage}
+\begin{block}{Assignment from functions}
+	In fact, the identifier (name) of the functions are actually values of function pointers. 
+\begin{minted}{c++}
+int max(int x, int y) { return x > y ? x : y;}
+int (*cmp)(int, int) = max;
+\end{minted}
+\end{block}
+\vspace{-0.1in}
+\begin{block}{Invoking a function pointer}
+	You can invoke a function pointer by applying operator \texttt{()} to it.
+\begin{minted}{c++}
+int m = cmp(10, 20); // No need to dereference it
+\end{minted}
+\end{block}
+\vspace{-0.1in}
+\begin{block}{Invariance under \texttt{*}}
+	Dereferencing a function pointer still gives back a function pointer.
+\begin{minted}{c++}
+int m = cmp(10, 20); // 20
+int n = (*cmp)(10, 20); // 20
+int p = (*******cmp)(10, 20) // 20
+\end{minted}
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Example}
+The following code implements a simple calculator. Notice how function pointer helps to clarify the code.
+
+\texttt{$-->$ code/rc4fptr/fptr.cpp}
+\inputminted{c++}{code/rc4fptr/fptr.cpp}
+\end{frame}
+
+
+\begin{frame}[fragile]{\texttt{typedef} storage modifier}
+The \textbf{typedef} keyword is actually a storage modifier (like \texttt{static}), means it goes to wherever \texttt{static} can appear. 
+
+Reading a \texttt{typedef} is actually very simple:
+\begin{enumerate}
+	\item Ignore \texttt{typedef} and read the line as if it is a real declaration.
+	\item Now the ``declared" variable would have a declared type
+	\item Finally we put back \texttt{typedef}. The variable now become an alias to the declared type.
+\end{enumerate}
+Example:
+\begin{minted}{c++}
+typedef bool (*comparator)(double, double);
+typedef const Comparator const_comparator;
+const_comparator *p = nullptr;
+*p = min; // Error!, p is pointer-to-const
+comparator cmp[] = {min, max}; // Array of function ptrs
+\end{minted}
+\end{frame}
+
+
+\begin{frame}[fragile]{Semantic of \texttt{typedef}}
+\framesubtitle{Motivation}
+It is now to analyze the semantic of \texttt{typedef}: not how is used, but why is it used in such way. If you go through the standard library. you would find some code like:
+\begin{minted}{c++}
+typedef unsigned int size_t;
+\end{minted}
+What's the point of doing this if when you can just use \texttt{unsigned int }? Suppose you are trying to find your name with your student ID, which is an unsigned integer:
+\begin{minted}{c++}
+string getNameByID(unsigned int student). 
+\end{minted}
+This is not good, because \texttt{student} is not any \texttt{unsigned int}, it must be a student ID. You would like to emphasize on that:
+\begin{minted}{c++}
+typedef unsigned int student_id; 
+string getNameByID(student_id id);
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Semantic of \texttt{typedef}}
+But here comes a problem:
+\begin{center}
+	\structure{\texttt{typedef} creates alias, not new types.}
+\end{center}
+This essentially says both \texttt{student\_id} and \texttt{size\_t} are both alias for \texttt{unsigned int}. They are essentially considered the same thing.
+
+The following code does not \textbf{NOT} make sense:
+
+\begin{minted}{c++}
+size_t numberOfApples = 20;
+string name = getNameByID(numberOfApples);
+\end{minted}
+
+but the compiler lets you do this without even a warning. Semantic of the types should prevent you from making these assignments (easily), but \texttt{typedef} breaks this promise.
+
+On the other hand, \texttt{classes} are more modern. Two \texttt{classes} with same ``composition" are considered incompatible different types.`
+
+\end{frame}
+
+\subsection{Procedure Abstraction}
+\begin{frame}{Abstraction and \textit{decoupling}}
+The motivation of all abstraction comes directly from the need for decoupling. We would like to design the software in such way, that the change in one portion of the code does not affect the others.
+
+\vspace{0.1in}
+But after all some degree of coupling is inevitable, conceptually we would like to limit the coupling only to the interfaces, i.e. where modules connect.
+
+\begin{columns}
+	\column{.33\textwidth}
+	\structure{Low coupling:}
+	\begin{figure}
+		\centering
+		\includegraphics[scale=0.34]{fig/low-coupling}
+	\end{figure}
+	\column{.34\textwidth}
+	\structure{High coupling:}
+	\begin{figure}
+		\centering
+		\includegraphics[scale=0.35]{fig/high-coupling}
+	\end{figure}
+	\column{.33\textwidth}
+	\structure{Low coupling for flexibility:}
+	\begin{figure}
+		\centering
+		\includegraphics[scale=0.33]{fig/low-coupling-flex}
+	\end{figure}
+\end{columns}
+
+\end{frame}
+
+\begin{frame}{Independence of variation}
+We some times simply refer these interfaces, or connection points, \textit{the abstraction}. Now we take a look at the \textit{implementation} side of the abstraction.
+
+If you the abstraction implementation is done right, you should find the following property of your abstraction.
+
+\begin{itemize}
+	\item Locality. The implementation should only depend on other abstraction, not abstraction implementation.
+	\item Substitutable. The implementation is not unique. Any implementation that obeys the abstraction should work.
+\end{itemize}
+
+The ultimate goal is the the only coupling point in your program should be the abstraction. \alert{So this is utterly import to always think through the abstraction before the actual implementation.}
+\end{frame}
+
+\begin{frame}{Elements in procedure abstraction}
+A common point of where modules connect is function calls. But think bigger, when you say \texttt{printf("\%d", 1)}, you are requesting a service, requesting for certain operation. This idea that programs are driven by requests for operations sums up to the idea of \textit{Procedure Abstraction}. Remember functions are just one realization of the idea of Procedure abstraction, but not the only one.
+
+We now examine how functions interact with the outside world. These things will be very important in specifying the abstraction:
+
+\begin{itemize}
+	\item Input and it's assumption
+	\item Expected output, and the property of the output
+	\item Impact on the environment, or side effects.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Specifying abstraction}
+Typically an abstraction is specified in the following manner:
+\begin{minted}{c++}
+int reallyUselessFoo(int& intArg, string str);
+// REQUIRES : intArg > 0, str != ""
+// MODIFIES : cout, intArg, UsefulGlobalVar
+// EFFECTS  : do Blah blah blah and return blah blah
+\end{minted}
+\begin{itemize}
+	\item \textit{REQUIRE} clause and the function signature specifies the input. Number of inputs are fully specified by the signature, input range can be partially specified through type. 
+	\item \textit{EFFECTS} clause and the function signature specifies  the output. The expected output is partially specified by the type of the return value. It is important to note that the function name is also part of the specification, it should clearly and concisely reflect on what the function does. 
+	\item \textit{MODIFIES} clause specify side effects.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Side effects}
+We have left out the term ``side effects" for now. Let's take a look at them. Think of mathematical functions, you would expect the following of them:
+\begin{block}{Functions are maps}
+Functions should return the same if provided same input:
+\begin{minted}{c++}
+(fun(x) == fun(x)) == true
+\end{minted}
+
+\end{block}
+\begin{block}{Functions are stateless}
+Programs should behave the same for the following two lines
+\begin{minted}{c++}
+int x = foo(y); int z = bar(x, x);
+int z = bar(foo(y), foo(y));
+\end{minted}
+
+The following 2 lines should also be equivalent.
+\begin{minted}{c++}
+int x = foo(y); 
+int x = foo(y); int x = foo(y);
+\end{minted}
+
+\end{block}
+\end{frame}
+
+\begin{frame}[fragile]{Side effects}
+It is our intuition that all these assertions should be true. But unfortunately we can break them. Once we break these intuitions it will be very hard for programmers to keep track of program.
+
+\structure{Through global/static variables}
+\begin{minted}{c++}
+int x = 3; int foo(int y) {return y + x++;}
+int bar(int y) {static int x = 0; return y + x++;}
+\end{minted}
+\structure{Through modifying arguments}
+\begin{minted}{c++}
+int x = 3; int foo(int& x) {return ++x;}
+\end{minted}
+\structure{Involving IO}
+\begin{minted}{c++}
+int x = 3; int foo(int x) {cout << "Hello"; return x;}
+\end{minted}
+
+Functions are suppose to be maps, converting one value to another. In all these values the function does something else. They modify something that does not belong to them. 
+
+These behaviors are called \textit{side effects}.
+\end{frame}
+
+\begin{frame}[fragile]{Function signature is important}
+A huge amount of information is provided in the function signature. In fact we believe the following should be true:
+\begin{center}
+	\structure{Good code should be self explanatory.\\ Good abstraction should be self documenting.}
+\end{center}
+It means you should be able to guess the abstraction's usage, just by looking at it's function signature. Compare the following:
+\begin{minted}{c++}
+void dwcl(double a, double b, double c);
+void drawCircle(Point p, double radius);
+\end{minted}
+It is generally considered good to 
+\begin{itemize}
+	\item Avoid introducing too much arguments. Pack arguments that are related into structure / classes.
+	\item Avoid using acronyms in function names. You have very good editors that provides extensive support for auto-completion.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Leaky Abstractions}
+Officially our discussion of procedural abstraction has ended. But I would like to make a few comments. We would like to ask:
+\begin{center}
+	\structure{Are there PERFECT abstractions?}
+\end{center}
+Perfect abstractions are abstractions that completely hides information about the implementation, a complete black box. People often need a perfect abstraction, e.g. for cryptography.
+
+Compare the following, assume both arguments are positive:
+\begin{minted}{c++}
+int mul1(int x, int y) {return x * y;}
+int mul2(int x, int y) {return x==0 ? 0 : y+mult(x-1,y));}
+\end{minted}
+Both implementation are correct. Can we differentiate them? The second one is significantly slower than the first one. If we provide a really large input, we would be able to differentiate them by the runtime! We say we have a \textit{leaky abstraction} at our hand.
+\end{frame}
+
+\begin{frame}[fragile]{the Law of Leaky Abstractions}
+the Law of Leaky Abstractions (Spolsky, 2002) says:
+\begin{quotation}
+	\structure{All non-trivial abstractions, to some degree, are leaky.}
+\end{quotation}
+How is this important? By now should be clear that the proper functionality of software (and computer system) is often depends on the reliability of abstraction. But at some point, the abstraction will break. Examples:
+\begin{itemize}
+	\item In C/C++ iterating through large 2D array horizontally is significantly faster than vertically.
+	\item \textit{L3-cache side channel attack}. Takes advantage a leaky abstraction inside the CPU to steal your ``password".
+\end{itemize}
+As a measure to counter this problem you sometimes see the standard not only specify a function's behavior, but also it's runtime (in terms of time complexity).
+\end{frame}
+
+\begin{frame}{Enforcing Abstraction in C++}
+Another very interesting thing here is what happens if you breaks the abstraction? How abstraction is enforced in C++?
+\begin{itemize}
+	\item Input number and types are protected by the type system.
+	\item Input But the properties of input (even?) are left unsaid.
+	\item Output type and number (guarantees there exists one output if needed) is protected by the type system.
+	\item Whether output fits the expected behavior is unchecked.
+	\item Side effects are completely unchecked.
+\end{itemize}
+As you can see many things are left unchecked! Most of the checking is done by the type system. In fact, the type system plays a really important role in programming language.	The fact that C/C++ is a statically typed language is greatly complimented and provides much help in writing correct programs.
+\end{frame}
+
+\begin{frame}{Enforcing Abstraction: How far can we go?}
+Here I list a couple of other language's idea. You may or may not know that language, but that's completely alright.
+\begin{description}[Matlab/Python]
+	\item[Matlab/Python] Dynamically typed. The type of arguments are not declared and only known at runtime.
+	\item[Bash] Scripting language used by shell. Not even typed. Not even check the arguments of function called. Basically zero protection.
+	\item[Haskell] A language that is statically typed. The type system is so powerful that it requires the programmer to declare not only the inputs, but also the ``side effects" (and checks them). 
+	\item[COQ] A language that goes to the extreme. It not only asks the programmer to declare everything, it even requires the program to provide a proof (and checks the proof) of correctness.
+\end{description}
+\end{frame}
