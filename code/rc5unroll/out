@@ -1,0 +1,2 @@
+Opended : file1.in // Opended : file2.in
+I Returned! // Closed file2.in // Closed file1.in

@@ -499,7 +499,7 @@ Perfect abstractions are abstractions that completely hides information about th
 Compare the following, assume both arguments are positive:
 \begin{minted}{c++}
 int mul1(int x, int y) {return x * y;}
-int mul2(int x, int y) {return x==0 ? 0 : y+mult(x-1,y));}
+int mul2(int x, int y) {return x==0 ? 0 : y+mul2(x-1,y));}
 \end{minted}
 Both implementation are correct. Can we differentiate them? The second one is significantly slower than the first one. If we provide a really large input, we would be able to differentiate them by the runtime! We say we have a \textit{leaky abstraction} at our hand.
 \end{frame}
@@ -509,7 +509,7 @@ the Law of Leaky Abstractions (Spolsky, 2002) says:
 \begin{quotation}
 	\structure{All non-trivial abstractions, to some degree, are leaky.}
 \end{quotation}
-How is this important? By now should be clear that the proper functionality of software (and computer system) is often depends on the reliability of abstraction. But at some point, the abstraction will break. Examples:
+How is this important? By now should be clear that the proper functionality of software (and computer system) often depends on the reliability of abstraction. But at some point, the abstraction will break. Examples:
 \begin{itemize}
 	\item In C/C++ iterating through large 2D array horizontally is significantly faster than vertically.
 	\item \textit{L3-cache side channel attack}. Takes advantage a leaky abstraction inside the CPU to steal your ``password".

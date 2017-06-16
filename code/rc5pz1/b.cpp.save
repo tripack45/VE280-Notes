@@ -1,0 +1,9 @@
+#include <iostream>
+using namespace std;
+struct S {int x; char y[5];};
+void foo() {
+    S s;    cout << &s.x << endl;
+    cout << (void*)s.y  << endl;
+    cin >> s.y; while(--x) cout << s.x << endl;
+}
+int main() {foo();}
