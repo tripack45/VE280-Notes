@@ -1,0 +1,36 @@
+\section{RC Week 7}
+\subsection{Program Arguments}
+\begin{frame}[fragile]{Syntax}	
+The following program 
+\begin{minted}{c++}
+int main(int argc, char* argv[]) {
+    for (int i = 0; i < argc; i++)
+        cout << "argv[i] = " << argv[i]; << endl;
+}
+\end{minted}
+If executed with \texttt{../run/a.out Hello "123 23" 123 23}:
+\begin{minted}{text}
+argv[0] = ../run/a.out
+argv[1] = Hello
+argv[2] = 123 23
+argv[3] = 123
+argv[4] = 23
+\end{minted}
+The first argument is always the ``program name". Keep in mind the actual arguments start with index \texttt{1}. The system essentially breaks the calling command by spaces and put each segment into an array.
+\end{frame}
+
+\begin{frame}[fragile]{An example}
+The following program checks if there are more than $n$ arguments that begins with \texttt{'!'}, $n$ is the first argument.
+\begin{minted}{c++}
+int main(int argc, char* argv[]) {
+    if (argc < 2) return -1; // At least 2 arguments.
+    int n = atoi(argv[1]); // Second argument
+    for (int i = 2; i < argc; i++)
+        // Strings starg with 3rd argument
+        if (argv[i][0] == '!') n--;
+    if (n <= 0) cout << "Yes!" << endl;
+    else cout << "No!" << endl;
+    return 0;
+}
+\end{minted}
+\end{frame}

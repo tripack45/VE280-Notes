@@ -220,3 +220,6 @@ TSWLatexianTemp*
 *-tags.tex
 
 build/
+code/test
+*.zip
+
