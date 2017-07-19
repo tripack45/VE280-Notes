@@ -1,0 +1,191 @@
+\section{RC Week 10}
+\subsection{\texttt{new} Operator, Deep Copying, RAII and Resource Management}
+
+\begin{frame}{Overview}
+This chapter we dealt with a bunch of all related cocepts, for a better under standing we would first clarify the following:
+\begin{itemize}
+    \item \textbf{Resource Management} is the problem we are tackling. Resources includes ``Memory", files, IO Devices (printers, Internet connections) and Locks, Mutexes, Semaphores when you learned VE482/EECS482. Often there is a limited amount of them and programs share them.
+    \item \textbf{RAII}, stands for \textbf{R}esource \textbf{A}cquisition  \textbf{I}s \textbf{I}nstantiation. It's the idea behind all these messy rules. The key problem in RAII is to identify \textbf{ownership}. 
+    \item \textbf{Deep Copying} is the technique is used to implement RAII.
+    \item \textbf{\texttt{new} and \texttt{delete}} simply represents the one most common resource used in programs.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Need for the \texttt{new} and \texttt{delete}}
+We once again examine the necessity for the two operators:
+\begin{itemize}
+    \item Programs may require an statically unknown number objects. For examples, for a database (think of fancy spreed sheet!) application number of entries in a table is unknown when the program is designed.
+    \item The precise time for the creation (allocation) and release of these objects are unknown in compile-time.
+\end{itemize}
+This calls for a mechanism that
+\begin{itemize}
+    \item Allocates \textbf{the object} on-demand.
+    \item Destroys \textbf{the object} on-demand.
+\end{itemize}
+It just happens that these objects requires memory. One should always understand that \texttt{new} is different than \texttt{malloc} in that it does not just allocate memory. \alert{It allocates objects, it just happens that these objects requires memory!.}
+\end{frame}
+
+\begin{frame}{The Heap}
+This graph is up-side-down, This is the same graph in page 103.
+\begin{columns}
+	\column{.3\textwidth}
+	\vspace{-0.05in}
+	
+	\begin{bytefield}[leftcurly=., leftcurlyspace=0pt]{8}
+		\begin{leftwordgroup}{Low}
+			\bitbox{8}{Text}
+		\end{leftwordgroup}\\
+		\begin{leftwordgroup}{}
+			\bitbox{8}{Consts}
+		\end{leftwordgroup}\\
+		\begin{leftwordgroup}{}
+		\bitbox{8}{Statics}
+		\end{leftwordgroup}\\
+		\begin{leftwordgroup}{High}
+			\wordbox[lrt]{1}{Heap $\downarrow$} \\
+			\skippedwords \\ 
+			\bitbox[lrb]{8}{Stack $\uparrow$}
+		\end{leftwordgroup}\\
+	\end{bytefield}
+	
+	\column{.7\textwidth}
+	\vspace{-0.15in}
+	\begin{itemize}
+	\item Since we cannot decide when to allocate and when to destroy the object we surely CANNOT allocate the objects from the stack. The only way is to allocate them from a separate region, which is the Heap.
+	\item The name is strange in that there is no commonly agreed upon origin. According to TAOCP by Knuth several authors starts to using it and everybody follows through.
+	\item Heap is usually much bigger than stack. You should allocate large amount of memory only on heap. But that's not the decisive reason.
+	\end{itemize}
+\end{columns}
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{new} and \texttt{new[]}}
+\texttt{new} and \texttt{new[]} does the following:
+\begin{itemize}
+\item Allocates space in heap (for one or a number of objects). 
+\item Constructs object in-place (including, but not limited to ctor). 
+\item Returns the ``first" address.
+\end{itemize}
+The syntax for \texttt{new} operator are very simple 
+\begin{minted}{c++}
+Type* obj0 = new Type;   // Default construction
+Type* obj1 = new Type(); // Default construction
+Type* obj2 = new Type(arg1, arg2); 
+Type* objA0 = new Type[size]; // Default cons each elt
+Type* objA1 = new Type[size](); // Same as obj A1
+\end{minted}
+For array allocation has no easy to use ``construct with argument" option. In fact array allocation is seldom useful. You should always consider \texttt{std::vector} instead when you learned \texttt{STL}.
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{delete} and \texttt{delete[]}}
+Since \texttt{new}-expressions allocates memory from the heap, they essentially requested (and occupies) resources from the system. For long running programs resources must always be returned (or released) when the program is finished with them, otherwise the program will end up draining all system resources, in our case running out of memory. 
+
+\texttt{delete} and \texttt{delete[]} releases the objects allocated from \texttt{new} and \texttt{delete[]} \alert{respectively}. They does the following:
+\begin{itemize}
+\item Destroy the object (each object in the array) being released (by calling the \textit{destructor} of the object).
+\item Returns the memory to the system.
+\end{itemize}
+We must emphasize that \alert{\texttt{delete} an object more than once, or delete an array allocated using \texttt{new[]} by \texttt{delete} instead of \texttt{delete[]} cause undefined behavior!}
+\end{frame}
+
+\begin{frame}[fragile]{Memory Leaks}
+\small
+Now the problem of memory leak seems obvious. If an object is allocated, but not released after the program is done with it, the system would assume the resource is still being used (since it won't examine the program), but the program will never use it. Thus resource is ``leaked", i.e. no longer available for using. In our case the leaked resource is memory. 
+\begin{minted}{c++}
+void foo() {int* p = new int(0); /* Code */}
+\end{minted}
+The function \texttt{foo} causes memory leak each time it is being called. When the function returned the handle of the resource, i.e. the address (stored in \texttt{p}), is lost, thus the program is unable to release the memory. Thus we have a memory leak. 
+
+Technically memory leak represents all situations where resources are not released once the program is done with it. The following program also ``leak" resources in the technical sense.
+\begin{minted}{c++}
+IntPointerSet s;
+void foo() {int* p = new int(0); s.add(p); /* Code */}
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Fixing Memory Leaks}
+Fixing memory leaks is by no means as simple as you might thought! You might thought the following code fixes the \texttt{foo} once and for good.
+\begin{minted}{c++}
+void foo() {int* p = new int(0); /* Code */ delete p;}
+\end{minted}
+But what if an exception is thrown in \texttt{/* Code */}? The function will return immediately at the point of exception, skipping the final \texttt{delete} statement. You could
+\begin{minted}{c++}
+try{/* Code */}catch(...){delete p; throw;} 
+\end{minted}
+But I trust you know the draw back!. Another problem is what if \texttt{foo} has multiple return point? Will you be able to remember to release everything whenever you \texttt{return}?. What if above two situation are mixed? 
+
+All these problem suggest we need a better way of handling the problem! We need a strategy other than patches!
+\end{frame}
+
+\begin{frame}{Lifetime of objects}
+\small
+We now take a little digression. The \textit{lifetime of an object}, sometimes ``life cycle", is the period starting from creation of object, to the point the object is destroyed. We typically has (roughly) 3 of them
+\begin{itemize}
+\item Global objects. They are created when the program starts and destroyed when the program is terminated. Including global variables and \texttt{static} variables.
+\item Automatic objects. Basically local variables.
+\item Dynamic objects. Objects created/deleted on-demand through \texttt{new} and \texttt{delete}.
+\end{itemize}
+From the lifetime view resource leaks are simply dynamic objects whose lifetime should have been terminated when they are no longer useful.
+
+It should be clear that the lifetime of the objects is tightly related to the \textit{scope} of the variable. This is natural. Since global objects can be access by any portion of the program they have to exist throughout the program. Local objects are only visible in the enclosing brackets thus they are destroyed when they go out of scope. 
+\end{frame}
+
+\begin{frame}{Binding resource to the scope}
+The solution to our previous problem is to bind the resource to a scope where it is needed. The detailed way of doing so is:
+\end{frame}
+
+\begin{frame}{RAII}
+\small
+Stands for \textit{Resource Acquisition Is Instantiation}. RAII is perhaps the one most famous rule specific to C++, unfortunately with an extremely terrible name! Recently people are start referring to the rule by \textit{Scope-based Resource Management}. It's a little bit clearer, but by no means summarizes it's full power. RAII requires the following:
+\begin{center}
+\structure{Holding an resource is a class invariant!}
+\end{center}
+With a little (?) bit explanation:
+\begin{itemize}
+\item Resource is allocated in ctors and ctors only.
+\item Resource is released in destrctors (dtors).
+\item Object ``owns" the resources. The resource is managed by the object and the object only. 
+\item The resources would share it's life cycle with object. As long as there is no object leak there is no resource leak. Fortunately we know automatic objects are destroyed by the compiler when they go out of scope, impossible to have object leak.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Destructors}
+Often denoted as \texttt{dtor}s for short. Destructors should:
+\begin{itemize}
+\item Be named as \texttt{\~ClassName}.
+\item Takes no argument and returns nothing (Not even \texttt{void}).
+\item If one expect the class to be inherited the dtor should be declared as virtual.
+\item Release resource allocated only in this class (don't release base class resources!).
+\end{itemize}
+The process of destroying an object is as follows:
+\begin{itemize}
+\item It calls the dtor of the class.
+\item Calls the dtors for each member of \alert{current} class.
+\item Calls dtor of the base class.
+\item Does above recursively until no more dtors to invoke. Finally it releases the memory.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Dtor examples: Free only current class member}
+The following code cause double free problem.
+\end{frame}
+
+\begin{frame}[fragile]{Dtor examples: Virtual dtor}
+The following code causes memory leak.
+\end{frame}
+
+\begin{frame}[fragile]{Linked List example}
+The following code causes memory leak.
+\end{frame}
+
+\begin{frame}[fragile]{Resource management: Copying}
+Keep in mind that an object ``owns" the resources. In our previous examples 
+\end{frame}
+
+\begin{frame}{Smart Pointers}
+\end{frame}
+
+\begin{frame}{Singleton Pattern}
+\end{frame}
+
+\begin{frame}{Move Semantic}
+\end{frame}
