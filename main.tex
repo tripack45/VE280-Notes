@@ -7,8 +7,8 @@
 	\hspace{5em}%
 	\textbf{\insertframenumber/\inserttotalframenumber}
 }
-%\usepackage[outputdir=build]{minted}
-\usepackage{minted}
+\usepackage[outputdir=build]{minted}
+%\usepackage{minted}
 \usepackage{latexsym}
 \usepackage{menukeys}
 \usepackage{bytefield}
@@ -17,6 +17,8 @@
 
 \usepackage{tikz}
 \usetikzlibrary{shapes,arrows}
+
+\usepackage{macro}
 
 %\usepackage[bars]{beamerthemetree} % Beamer主题样式v 2.2
 \usetheme{Antibes} % Beamer主题样式v 3.0
@@ -44,6 +46,7 @@
 	\end{frame}
 	
 	\begin{frame}[allowframebreaks]
+		\small
 		\frametitle{Table Of Contents}
 		\tableofcontents
 	\end{frame}
@@ -57,5 +60,7 @@
 	\include{week8}
 	\include{week9}
 	\include{week10}
+	\include{week11}
+	\include{week12}
 	
 \end{document}

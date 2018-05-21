@@ -503,41 +503,5 @@ void foo(int n) {
 \end{frame}
 
 
-%\begin{frame}[fragile]{Problems with exception}
-%\structure{Quotation from Google C++ Style Guide:}
-%\begin{quotation}
-%	\alert{We do not use C++ exceptions}. ... Our advice against using exceptions is not predicated on philosophical or moral grounds, but practical ones. ... Things would probably be different if we had to do it all over again from scratch.
-%\end{quotation}
-%
-%\structure{The Criticism}
-%
-%Again we quote from the same document:
-%\begin{quotation}
-%	When you add a throw statement to an existing function, you must examine all of its transitive callers. Either they must make at least the \alert{basic exception safety guarantee}, or they must never catch the exception and be happy with the program terminating as a result.
-%\end{quotation}
-%
-%\tiny{\verb|https://google.github.io/styleguide/cppguide.html#Exceptions|}
-%\end{frame}
-%
-%\begin{frame}[fragile]{Exceptions causing problem}
-%Consider the following code:
-%\begin{minted}{c++}
-%
-%\end{minted}
-%\end{frame}
-%
-%
-%\begin{frame}[fragile]{Exception Safety}
-%There are in general 3 levels of exception safety:
-%\begin{description}[No-throw Guarantee]
-%	\item[No-throw Guarantee] The function will not throw an exception or \alert{allow one to propagate}. 
-%	\item[Strong Guarantee] If a function terminates because of an exception, it will not leak memory and no data will not be modified, if it has never been called from the beginning.
-%	\item[Basic Guarantee] If an exception is thrown, no resource (memory) is leaked ... though the data might have been modified.
-%\end{description}
-%
-%Understand these guarantees as part of the specification for your function. Exceptions allows the function to interact with the outside world (by throwing exceptions) and it requires the outside world to change accordingly (catch exceptions).
-%
-%\tiny{From MSDN 0\verb|https://msdn.microsoft.com/en-us/library/hh279653.aspx|}
-%\end{frame}
 
 
