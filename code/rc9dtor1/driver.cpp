@@ -2,7 +2,7 @@
 #include "classes.h"
 
 void foo() {
-    Derived* ptrA = new Base; 
+    Base* ptrA = new Derived; 
     delete ptrA; // Memroy Leak!
 }
 

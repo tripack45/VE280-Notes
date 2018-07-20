@@ -255,4 +255,6 @@ TSWLatexianTemp*
 build/
 code/test
 *.zip
-
+.DS_Store
+*.o
+.vscode

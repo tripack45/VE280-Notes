@@ -1,4 +1,5 @@
 \section{RC Week 6}
+
 \subsection{Engineering correctness: Testing}
 \begin{frame}{The definitive correctness myth}
 We quote the following words from one of yours (@LukeXuan)
@@ -194,29 +195,8 @@ TEST_P(SelectionTest, DSelection) {
 \end{minted}
 \end{frame}
 
-\begin{frame}[fragile]{\textit{Google Test} framework}
-Project Homepage: \texttt{https://github.com/google/googletest}
-Introduction is available if you  \hyperlink{https://github.com/google/googletest/blob/master/googletest/docs/Primer.md}{click here}
-
-Here is a portion of code I used to test my VE281 project:
-\begin{minted}{c++}
-TEST_P(SelectionTest, DSelection) {
-int *d= dataset->getCopied();
-int size = dataset->getSize();
-for (int i = 0; i < size; ++i) {
-int val = deterministicSelection(d, size, i);
-int answer = dataset->select(i);
-ASSERT_EQ(val, answer);
-delete[] d;
-d = dataset->getCopied();
-}
-delete[] d;
-}
-\end{minted}
-\end{frame}
-
 \begin{frame}{Google Test in CLion}
-\vspace{-0.2in}
+\vspace{-0.3in}
 
 \begin{figure}
 	\centering
@@ -333,7 +313,26 @@ The second makes calling ``unnatural. Also performance drawbacks.
 \end{frame}
 
 \begin{frame}[fragile]{Structural Error handling: \texttt{try}, \texttt{catch} and \texttt{throw}}
-We know introduce you to \textit{Structural Error Handling}. 
+We know introduce you to \textit{Structural Error Handling}. The following is a try block
+\begin{minted}{c++}
+// (1)
+try {
+    // (2) (may throw;)
+} catch (const T& e) {
+    // (3) ...
+}
+// (4)
+\end{minted}
+Just like usually \texttt{if}, \texttt{while} blocks, a \texttt{try} block marks a special control flow, featuring (usually) 2 different code execution paths.
+\begin{itemize}
+	\item Path 1. Exception raised in (2), we go (1) (2, partial) (3) (4).
+	\item Path 2. Normally we go (1) (2) (4).
+\end{itemize}
+Path 1 assumes the exception is caught. Further discussion on next slide.
+\end{frame}
+
+\begin{frame}[fragile]{Structural Error handling: \texttt{try}, \texttt{catch} and \texttt{throw}}
+An concrete example. 
 \begin{minted}{c++}
 try {
     cout << "hello!" << endl; throw 123;
@@ -501,7 +500,6 @@ void foo(int n) {
 	The very reason that you need to catch exceptions by reference is simply because exceptions can contain virtual functions.
 \end{block}
 \end{frame}
-
 
 
 

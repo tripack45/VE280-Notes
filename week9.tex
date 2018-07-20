@@ -1,95 +1,563 @@
 \section{RC Week 9}
-\subsection{Sub-types, Code Reuse and Inheritance}
-\begin{frame}{Principals of Object Oriented Programming}
-There are 5 widely accepted principles throughout the object oriented design:
-\begin{enumerate}
-	\item \alert{S}ingle responsibility principle
-	\item \alert{O}pen/close principle
-	\item \textbf{\alert{L}iskov substitution principle}
-	\item \alert{I}nterface segregation principle
-	\item \alert{D}ependency inversion principle
-\end{enumerate}
+\subsection{\texttt{new} Operator, Deep Copying, RAII and Resource Management}
+
+\begin{frame}{Overview}
+This chapter we dealt with a bunch of all related cocepts, for a better under standing we would first clarify the following:
 \begin{itemize}
-	\item The idea of ``abstract data type" by first proposed by Barbara Liskov and Stephan Zilles (1974) in  "Programming with abstract data types".
-	\item Later on in Liskov's 1988 key note ``Data Abstraction and Hierarchy", the SOLID principles of object oriented programming was first proposed. 
+    \item \textbf{Resource Management} is the problem we are tackling. Resources includes ``Memory", files, IO Devices (printers, Internet connections) and Locks, Mutexes, Semaphores when you learned VE482/EECS482. Often there is a limited amount of them and programs share them.
+    \item \textbf{RAII}, stands for \textbf{R}esource \textbf{A}cquisition  \textbf{I}s \textbf{I}nstantiation. It's the idea behind all these messy rules. The key problem in RAII is to identify \textbf{ownership}. 
+    \item \textbf{Deep Copying} is the technique is used to implement RAII.
+    \item \textbf{\texttt{new} and \texttt{delete}} simply represents the one most common resource used in programs.
 \end{itemize}
 \end{frame}
-\begin{frame}{Principals of Object Oriented Programming}
+
+\begin{frame}{Need for the \texttt{new} and \texttt{delete}}
+We once again examine the necessity for the two operators:
+\begin{itemize}
+    \item Programs may require an statically unknown number objects. For examples, for a database (think of fancy spreed sheet!) application number of entries in a table is unknown when the program is designed.
+    \item The precise time for the creation (allocation) and release of these objects are unknown in compile-time.
+\end{itemize}
+This calls for a mechanism that
+\begin{itemize}
+    \item Allocates \textbf{the object} on-demand.
+    \item Destroys \textbf{the object} on-demand.
+\end{itemize}
+It just happens that these objects requires memory. One should always understand that \texttt{new} is different than \texttt{malloc} in that it does not just allocate memory. \alert{It allocates objects, it just happens that these objects requires memory!.}
+\end{frame}
+
+\begin{frame}{The Heap}
+This graph is up-side-down, This is the same graph in page 103.
 \begin{columns}
-\column[]{.6\textwidth}
-Barbara Liskov (1939 to present)
-\begin{itemize}
-	\item MIT computer scientist
-	\item Ford Professor of Engineering
-	\item One of the American's first women PH.D. in Computer Science
-\end{itemize}
-\column[]{.4\textwidth}
-
-	\vspace{-.15in}\hspace{-.18in}
-	\includegraphics[scale=0.08]{fig/barbara-liskov}
-
+	\column{.3\textwidth}
+	\vspace{-0.05in}
+	
+	\begin{bytefield}[leftcurly=., leftcurlyspace=0pt]{8}
+		\begin{leftwordgroup}{Low}
+			\bitbox{8}{Text}
+		\end{leftwordgroup}\\
+		\begin{leftwordgroup}{}
+			\bitbox{8}{Consts}
+		\end{leftwordgroup}\\
+		\begin{leftwordgroup}{}
+		\bitbox{8}{Statics}
+		\end{leftwordgroup}\\
+		\begin{leftwordgroup}{High}
+			\wordbox[lrt]{1}{Heap $\downarrow$} \\
+			\skippedwords \\ 
+			\bitbox[lrb]{8}{Stack $\uparrow$}
+		\end{leftwordgroup}\\
+	\end{bytefield}
+	
+	\column{.7\textwidth}
+	\vspace{-0.15in}
+	\begin{itemize}
+	\item Since we cannot decide when to allocate and when to destroy the object we surely CANNOT allocate the objects from the stack. The only way is to allocate them from a separate region, which is the Heap.
+	\item The name is strange in that there is no commonly agreed upon origin. According to TAOCP by Knuth several authors starts to using it and everybody follows through.
+	\item Heap is usually much bigger than stack. You should allocate large amount of memory only on heap. But that's not the decisive reason.
+	\end{itemize}
 \end{columns}
-\begin{itemize}
-	\item 2004 John von Neumann Medal winner for "fundamental contributions to programming languages, programming methodology, and distributed systems"
-	\item 2008 Turing Award winner, for her work in the design of programming languages and software methodology that led to the development of object-oriented programming
-\end{itemize}
 \end{frame}
 
-\begin{frame}[allowframebreaks]{Sub types and Liskov Substitution Rule}
-The substitution rule is formally described as follows:
+\begin{frame}[fragile]{\texttt{new} and \texttt{new[]}}
+\texttt{new} and \texttt{new[]} does the following:
+\begin{itemize}
+\item Allocates space in heap (for one or a number of objects). 
+\item Constructs object in-place (including, but not limited to ctor). 
+\item Returns the ``first" address.
+\end{itemize}
+The syntax for \texttt{new} operator are very simple 
+\begin{minted}{c++}
+Type* obj0 = new Type;   // Default construction
+Type* obj1 = new Type(); // Default construction
+Type* obj2 = new Type(arg1, arg2); 
+Type* objA0 = new Type[size]; // Default cons each elt
+Type* objA1 = new Type[size](); // Same as obj A1
+\end{minted}
+For array allocation has no easy to use ``construct with argument" option. In fact array allocation is seldom useful. You should always consider \texttt{std::vector} instead when you learned \texttt{STL}.
+\end{frame}
+
+\begin{frame}[fragile]{\texttt{delete} and \texttt{delete[]}}
+Since \texttt{new}-expressions allocates memory from the heap, they essentially requested (and occupies) resources from the system. For long running programs resources must always be returned (or released) when the program is finished with them, otherwise the program will end up draining all system resources, in our case running out of memory. 
+
+\texttt{delete} and \texttt{delete[]} releases the objects allocated from \texttt{new} and \texttt{delete[]} \alert{respectively}. They does the following:
+\begin{itemize}
+\item Destroy the object (each object in the array) being released (by calling the \textit{destructor} of the object).
+\item Returns the memory to the system.
+\end{itemize}
+We must emphasize that \alert{\texttt{delete} an object more than once, or delete an array allocated using \texttt{new[]} by \texttt{delete} instead of \texttt{delete[]} cause undefined behavior!}
+\end{frame}
+
+\begin{frame}[fragile]{Memory Leaks}
+\small
+Now the problem of memory leak seems obvious. If an object is allocated, but not released after the program is done with it, the system would assume the resource is still being used (since it won't examine the program), but the program will never use it. Thus resource is ``leaked", i.e. no longer available for using. In our case the leaked resource is memory. 
+\begin{minted}{c++}
+void foo() {int* p = new int(0); /* Code */}
+\end{minted}
+The function \texttt{foo} causes memory leak each time it is being called. When the function returned the handle of the resource, i.e. the address (stored in \texttt{p}), is lost, thus the program is unable to release the memory. Thus we have a memory leak. 
+
+Technically memory leak represents all situations where resources are not released once the program is done with it. The following program also ``leak" resources in the technical sense.
+\begin{minted}{c++}
+IntPointerSet s;
+void foo() {int* p = new int(0); s.add(p); /* Code */}
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Fixing Memory Leaks}
+Fixing memory leaks is by no means as simple as you might thought! You might thought the following code fixes the \texttt{foo} once and for good.
+\begin{minted}{c++}
+void foo() {int* p = new int(0); /* Code */ delete p;}
+\end{minted}
+But what if an exception is thrown in \texttt{/* Code */}? The function will return immediately at the point of exception, skipping the final \texttt{delete} statement. You could
+\begin{minted}{c++}
+try{/* Code */}catch(...){delete p; throw;} 
+\end{minted}
+But I trust you know the draw back!. Another problem is what if \texttt{foo} has multiple return point? Will you be able to remember to release everything whenever you \texttt{return}?. What if above two situation are mixed? 
+
+All these problem suggest we need a better way of handling the problem! We need a strategy other than patches!
+\end{frame}
+
+\begin{frame}{Digression: Diagnosing memory related problem}
+\small
+\texttt{valgrind} is not a tool that only looks for memory leaks. It actually looks for for all sorts of memory related problems, including:
+\begin{itemize}
+	\item Memory Leaks. 
+	\item Invalid accesses, array out-of-range, use of freed memory, etc.
+	\item Double free problems.
+\end{itemize}
+These problem are most likely UBs so bugs related to them are very likely to be elusive and random. Always use \texttt{valgrind} to check your program. It significantly improves your success rate on OJ.
+
+Valgrind can also act as a \textit{profiler}. A profiler measures how much time is spent on each portion of your code. It let you to know which portion is taking up the most time. Profiling is always the first step towards performance optimization.
+
+Valgrind does all these by tap into (hijacks) EVERY function call of your program, which comes with a truely significant performance cost. 
+
+For more information, RTFM, thank you. 
+\end{frame}
+
+\begin{frame}{Lifetime of objects}
+\small
+We now take a little digression. The \textit{lifetime of an object}, sometimes ``life cycle", is the period starting from creation of object, to the point the object is destroyed. We typically has (roughly) 3 of them
+\begin{itemize}
+\item Global objects. They are created when the program starts and destroyed when the program is terminated. Including global variables and \texttt{static} variables.
+\item Automatic objects. Basically local variables.
+\item Dynamic objects. Objects created/deleted on-demand through \texttt{new} and \texttt{delete}.
+\end{itemize}
+From the lifetime view resource leaks are simply dynamic objects whose lifetime should have been terminated when they are no longer useful.
+
+It should be clear that the lifetime of the objects is tightly related to the \textit{scope} of the variable. This is natural. Since global objects can be access by any portion of the program they have to exist throughout the program. Local objects are only visible in the enclosing brackets thus they are destroyed when they go out of scope. 
+\end{frame}
+
+
+
+\begin{frame}{Binding resource to the scope}
+
+The solution to our previous problem is to bind the resource to a scope where it is needed. The detailed way of doing so is:
+\twocolumncodenamed{code/rc9raii/ex.h}{code/rc9raii/ex.cpp}
+\end{frame}
+
+
+
+\begin{frame}{RAII}
+\small
+Stands for \textit{Resource Acquisition Is Instantiation}. RAII is perhaps the one most famous rule specific to C++, unfortunately with an extremely terrible name! Recently people are start referring to the rule by \textit{Scope-based Resource Management}. It's a little bit clearer, but by no means summarizes it's full power. RAII requires the following:
 \begin{center}
- If $S$ is a subtype of $T$, then objects of type $T$ may be replaced with objects of type $S$ (i.e. an object of type $T$ may be substituted with any object of a subtype $S$) without altering any of the desirable properties of $T$ (correctness, task performed, etc.)
+\structure{Holding an resource is a class invariant!}
 \end{center}
-This is by all means very abstract. We provide a more "concrete" explanation.
+With a little (?) bit explanation:
+\begin{itemize}
+\small
+\item Resource is allocated in ctors and ctors only.
+\item Resource is released in destrctors (dtors).
+\item Object ``owns" the resources. The resource is managed by the object and the object only. 
+\item The resources would share it's life cycle with object. As long as there is no object leak there is no resource leak. Fortunately we know automatic objects are destroyed by the compiler when they go out of scope, impossible to have object leak.
+Valgrind is only 
+\end{itemize}
+\end{frame}
 
+\begin{frame}{Destructors}
+Often denoted as \texttt{dtor}s for short. Destructors should:
+\begin{itemize}
+\item Be named as \texttt{\textasciitilde ClassName}.
+\item Takes no argument and returns nothing (Not even \texttt{void}).
+\item If one expect the class to be inherited the dtor should be declared as virtual.
+\item Release resource allocated only in this class (don't release base class resources!).
+\end{itemize}
+The process of destroying an object is as follows:
+\begin{itemize}
+\item It calls the dtor of the class.
+\item Calls the dtors for each member of \alert{current} class.
+\item Calls dtor of the base class.
+\item Does above recursively until no more dtors to invoke. Finally it releases the memory.
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Dtor examples: Memory Leak}
+The following code causes memory leak problem.
+\twocolumncodenamed{code/rc9dtor1/classes.h}{code/rc9dtor1/driver.cpp}
+\end{frame}
+
+\begin{frame}[fragile]{Dtor examples: Double Free}
+The following code causes double free problem.
+\twocolumncodenamed{code/rc9dtor1/ex2.h}{code/rc9dtor1/ex2.cpp}
+\end{frame}
+
+\begin{frame}[fragile]{Dtor examples: Free only what you ``own"}
+This is our correct solution.
+\twocolumncodenamed{code/rc9dtor1/ex3.h}{code/rc9dtor1/ex3.cpp}
+\end{frame}
+
+\begin{frame}[fragile]{Linked List example}
+\small
+To support our future discussion with a concrete example we must take the singly linked list example from the instructor.
+We would like to make a comment. Objects like the linked list are sometimes called ``containers". The major purpose of containers is to container other objects, store and more importantly arrange them in a manner suitable for specific access. For example:
+\begin{itemize}
+	\item Fast random access with few or no deletion at all? go for an array.
+	\item Only access front? Frequent insertion at front? linked list.
+\end{itemize}
+However there are in general 2 types of containers:
+\begin{itemize}
+	\item Container of value. The container only store the ``value" of inserted object. The container does not give you back the exact same object that you gives it. It only gives back a object that has the same ``value" you provided. It does NOT own the object.
+	\item Container of pointer. Think of a value container whose value are pointers. It gives you back the actual object. \alert{When you insert an object into a container of pointer, you are transfering ownership!}
+\end{itemize}
+\end{frame}
+
+\begin{frame}[fragile]{Linked List Interface}
+\inputminted[fontsize=\small]{c++}{code/Linked-List/IntList.h}
+\end{frame}
+
+\begin{frame}[fragile]{Linked List Implementation: \texttt{ctor} and \texttt{dtor}}
+\inputminted[firstline=4,lastline=15]{c++}{code/Linked-List/IntList.cpp}
+\end{frame}
+
+\begin{frame}[fragile]{Resource management: An analysis}
+Keep in mind that an object ``owns" the resources. Keep in mind as well that holding a resource is a class invariant. Whenever class invariant is in play we must question whether each operation breaks / preserves the invariant. 
+
+\begin{itemize}
+	\item Ctors and Dtors are checked already :=).
+	\item \texttt{insert()} and \texttt{remove()} might break invariant.
+	\item \texttt{print()} and \texttt{isEmpty()} are \texttt{const}.
+\end{itemize}
+
+But there are two cases that are more tricky.
+\begin{itemize}
+	\item When you pass the object by value, the content of the object will be copied, byte by byte. Now both the ``original" object and the ``copy" both owns the same actual list.
+	\item When you performs assignment a byte-wise copy will happen. In addition to the previous problem, the old object must give up it's ownership!
+\end{itemize}
+\end{frame}
+
+
+
+\begin{frame}[fragile]{\texttt{insert} and \texttt{remove}}
+A kind note: draw the graph when confused. Remember boundary condition that \texttt{first} could be empty!
+\inputminted[fontsize=\small, ,firstline=23,lastline=35]{c++}{code/Linked-List/IntList.cpp}
+\end{frame}
+
+\begin{frame}[fragile]{Resource management: Copying}
+Keep in mind that an object ``owns" the resources. \alert{A value container owns the location it used to store the values. A container to pointer owns both the location it used to store the pointers, but also the objects stored by the pointer.} 
+
+These invariants are part of that objects, and must be preserved for both the copied object and the original object when passed into a function. 
+
+When a variable is passed into a function by value, the copy constructor of a function will be called. The copy constructor has the following form, \alert{argument type is critical}!
+
+\begin{minted}{c++}
+class Type {
+// Omit other methods
+public:
+    Type(const Type& type); // Copy constructor
+}
+\end{minted}
+\end{frame}
+
+\begin{frame}[fragile]{Copy constructor}
+Just like the default constructor:
+\begin{itemize}
+	\item A copy constructor is ``synthesized" if not specified.
+	\item For types like \texttt{int} copy constructors performs byte-wise copy.
+	\item A synthesized copy constructor by default calls it's element's copy constructor.
+\end{itemize}
+All three rules combined provides the same behavior as in C when you pass a struct (class) by value. But the real process happened is listed above. But a copy constructor is after all a constructor and that gives us problems:
+\begin{itemize}
+	\small
+	\item If you only write a custom copy constructor, since there already exists one ctor, the default ctor will not be synthesized.
+	\item If you choose to write a custom copy ctor, you must remember to call the copy-ctor on each of your element in initialize list. If you don't, your members will be default initialized.
+\end{itemize}
+This gets much more complicated combined with inheritance. 
+\end{frame}
+
+\begin{frame}{Implementing the copy ctor}
+This is very easy to understand recursive algorithm. A comment is that a copy ctor is also a ctor, which means all rules applicable to a regular ctor applies to copy ctor as well, for example the initialization list. 
+ 	
+\inputminted[fontsize=\small,firstline=32,lastline=41]{c++}{code/Linked-List/IntList.cpp}
+\end{frame}
+
+\begin{frame}[fragile]{Operator Overloading}
+The first rule of thumb: 
 \begin{center}
-	\structure{Subtype relation is an ``IS-A" relationship.}
+	\structure{Operators are just functions}.
 \end{center}
-
-For examples, a \texttt{Swan} \alert{is a} \texttt{Bird}, thus a \texttt{class Swan} is a subtype of \texttt{class Bird}. A bird can fly, can quake and can lay eggs. A swan can also do these. It might do these better, but as far as we are concerned, we don't care. \texttt{Bird} is the super-type of the \texttt{Swan}.
-\end{frame}
-
-\begin{frame}{Pre-conditions \& Post-conditions}
-The term ``sub-type" is misguiding because the prefix ``sub" suggests the sub-type is ``inferior" to the super-type in some sense. But this is actually other way around. 
-
+And functions can be re-written. You can rewrite the effect of existing operator on your custom type. This is a very powerful tool of abstraction. For example you could overload $*$ on matracies, so that they looks as if they are regular values. It might surprise you how many operators can be overloaded:
 \begin{itemize}
-	\item The assertions in the \texttt{REQUIRES} clause and argument types in abstraction specs combined is called a ``Precondition".
-	\item The assertions in the \texttt{EFFECTS} and \texttt{MODIFIES} clause specifies the post conditions. 
+	\item Arithematic logic operators: $<<$, $+$, $-$, $*$, $==$, $||$, $\&$...
+	\item Unary logic: $!$, $~$
+	\item Special operators: $[]$ (array), $->$, $*$ (pointers), $()$ (function).
+	\item Memory: \texttt{new} and \texttt{delete}
+	\item And others ...
 \end{itemize}
 
-Sub-types typically perform a combination of belows:
+A few remark:
 \begin{itemize}
-	\item Supports extra operation. Naturally preserves follows LSR.
-	\item Weakens the pre-conditions. Expands range of input.
-	\item Strengthens the post-condition. Enhances the effect.
-\end{itemize}
-In reality sub-types are beefed-up versions of the super-type. They perform more specific jobs or do the same job better.
-\end{frame}
-
-\begin{frame}{Is it a subtype?}
-Designing whether something is or is not a subtype of a particular super type is probably in the heart of program structure design.
-
-\structure{A Remark}
-
-The problem of whether two objects form a ``IS-A" relation must be understood in a realistic context. Consider two classes \texttt{RegularIntSet} and \texttt{SortedIntSet}. Suppose both of them supports a \texttt{max()} function.
-\begin{itemize}
-	\item You can argue that \texttt{RegularIntSet} is a sub-type of \texttt{SortedIntSet} because they support the same set of operations.
-	\item You can also claim that\texttt{RegularIntSet} is NOT a sub-type since the \texttt{max()} of \texttt{RegularIntSet} is significantly slower than it's counterpart. One could argue the performance is part of the abstraction.
+	\item Overloaded operators preserves their old precedence. 
+	\item Overloaded operators preserves their old associativity.
 \end{itemize}
 \end{frame}
 
+\begin{frame}[fragile]{Overloaded operator \texttt{=}}
+\small
+It's better that to keep the original ``behavior" of an overloaded operator. For example you might want to overload $+$ with a function that preserves interchangeability. You might want to avoid overload operator $=$ with a function that returns a \texttt{bool}. For the operator \texttt{=}
 
-\begin{frame}{Differentiating \texttt{IS-A} and \texttt{HAS-A}}
-Suppose we have a \texttt{class Graph} that abstracts the concept of a graph. It supports \texttt{Graph::InsertNode(string name)} and \texttt{Graph::addEdge(string node1, string node2)}. Suppose we have a class \texttt{Binary} tree that inherits \texttt{Graph}. It supports one more operation \texttt{Tree::GetRoot()}. The question is whether \texttt{Tree} is a sub-type of \texttt{Graph}?
+\begin{minted}{c++}
+class Type {
+public:
+	Type& operator= (const Type& rhs);
+};
+\end{minted}
+\begin{itemize}
+	\item The return type should be a reference to the left hand side.
+	\item The keyword \texttt{operator} indicates opearator overloading. You can think the name of the function is \texttt{operator=}.
+	\item The argument type must be a const reference to the right hand side. 
+\end{itemize}
+Again if you don't overload the assignment operator, one will be synthesized for you, which follows similar rules as the cp-ctor.
 \end{frame}
 
-\begin{frame}{Differentiating \texttt{IS-A} and \texttt{HAS-A}}
-Unfortunately the answer is negative. The reason should be obvious. There is essentially no requirement on where the edges and nodes are (precondition is weak). But you can't add arbitrary edges and nodes must connect to at most 2 other nodes (stronger precondition). \alert{So a \texttt{Tree} is not a  \texttt{Graph} in the subtype sense}.
+
+\begin{frame}{Implementing the overloaded assignment operator}
+\inputminted[fontsize=\small,firstline=44,lastline=50]{c++}{code/Linked-List/IntList.cpp}
+
+In addition to the copying the overloaded assignment operator needs to first release the resources of the left hand side. Because the left hand side is letting go the ownership of old resources, and taking over new resources from the compied from list.
+
+There is a caveat. In the copy constructor the destination is guaranteed to be different from the source (why?). \alert{However one might assign a value to itself.} What problem would there be if the branch \texttt{if (this != \& l)} is not there? 
+\end{frame}
+
+
+
+\begin{frame}[fragile]{Move Semantic: The problem}
+Consider the following code, suppose we have a function combine
+\begin{minted}{c++}
+IntList combine(const IntList& l1, const IntList& l2);}
+\end{minted}
+In a function \texttt{foo} 
+\begin{minted}{c++}
+void foo() {
+	IntList l1; // Populate l1 with much data
+	IntLIst l2; // populate l2 again with data
+	IntList l3 = combine(l1, l2);
+}
+\end{minted}
+We examine what will happen on the third line.
+\begin{itemize}
+	\item On return of \texttt{combine}, a temporary object will be constructed.
+	\item The temporary object will be used to copy construct \texttt{l3}.
+	\item The temporary object will be deleted.
+\end{itemize}
+You should realize that the second step comes with a significant performance cost.
+\end{frame}
+
+\begin{frame}[fragile]{Move Semantic: An analysis}
+We now take a step back and think: We don't need to \textbf{copy} the content of temporary object. What we really need is to \textbf{move} the resources from the temporary object to the target object. We need a mechanism to transfer the ownership of resources from the temporary object to the target. The language features supporting this is called move semantics.
 
 \vspace{0.1in}
-However we would naturally see that a \texttt{Tree} type must have a lot common code as the \texttt{Graph}. We would like to avoid rewriting them. There are two ways to do this:
+We know that the temporal object is a rvalue, but in order to do what we expected we need to modify the temporal object, i.e. pass the temporal object by reference of some sort:
+
+\begin{minted}{c++}
+class Type {
+public:
+    Type(Type&& rhs); // A move constructor
+};
+\end{minted}
+Here \texttt{Type\&\& rhs} declares a \textit{rvalue-reference}.
+\end{frame}
+
+\begin{frame}[fragile]{Move Semantic: Implementation}
+\begin{minted}{c++}
+IntList::IntList(IntList&& rhs)
+    : first(rhs.first) {
+    rhs.first = nullptr;
+}
+\end{minted}
+Remember move constructor is also a ctor. In this very simple code it exchanges resources owned by the original object (which is empty) and the temporal object. Note argument is not \texttt{const}ed.
+
+Another similar situation is the case of assignment operator:
+\begin{minted}{c++}
+Type& operator=(Type&& rhs); // Move assignment
+\end{minted}
+And the implementation
+\begin{minted}{c++}
+IntList& IntList::operator=(IntList&& rhs) {
+	swap(this.first, rhs.first);
+}
+\end{minted}
+It is equally simple. The resources of the original object will be freed during the deconstruction of the temporal object.
+\end{frame}
+
+\begin{frame}[fragile]{The rule of big $X$}
+Where $X = 3$ traditionally and $X=5$ after c++11.
+\begin{center}
+	\structure{Whenever an object owns resources, any resources, not just memory, it should implement 5 methods:\\ A ctor and a dtor, A copy ctor, a move ctor, a copy assignment operator, and a move assignment operator}.
+\end{center}
+These are 5 typical situations where resource management and ownership is critical. You should never leave them unsaid. If you want to use the version synthesized by the compiler, use \texttt{=default}:
+\begin{minted}{c++}
+Type(const Type& type) = default;
+Type& operator=(Type&& type) = default;
+\end{minted}
+Traditionally constructor/destructor/copy assignment operator forms a rule of 3, you should know this if being questioned in the exam. Move semantics is a feature available after C++11. 
+\end{frame}
+
+\begin{frame}{Singleton Pattern}
+Very often some object is ``global". It is used by the entire program (for example \texttt{World} class). Probably this object should not be copied, or more likely cannnot be copied. Probably this object can only be validly instantiated once.
+
+Using a global variable is one possible solution, but hardly a good one. For instance if you have multiple global instances the order of their instantiation is not guaranteed. 
+
+A clean slate solution is called \textit{the singleton pattern}:
+
 \begin{itemize}
-	\item Through \texttt{private} inheritance (implementation inheritance). We would not discuss this.
-	\item By setting \texttt{Graph} as a member of a \texttt{Tree} type. We forward calls to \texttt{Graph}. This is a typical case of a \texttt{Has-A} implementation.
-\end{itemize} 
+	\item Clients use a \texttt{static} method to access the object.
+	\item Object is created on first access, than return every time.
+	\item Implement \texttt{private} constructor.
+	\item Use deleted copy ctor and deleted assignment operator to explicitly signify the client that this object is not copy-able.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Singleton pattern: Implementation}
+\inputminted[fontsize=\small]{c++}{code/rc9sgt/sgt.h}
+\end{frame}
+
+\begin{frame}[fragile]{Problems with exception}
+\structure{Quotation from Google C++ Style Guide:}
+\begin{quotation}
+	\alert{We do not use C++ exceptions}. ... Our advice against using exceptions is not predicated on philosophical or moral grounds, but practical ones. ... Things would probably be different if we had to do it all over again from scratch.
+\end{quotation}
+
+\structure{The Criticism}
+
+Again we quote from the same document:
+\begin{quotation}
+	When you add a throw statement to an existing function, you must examine all of its transitive callers. Either they must make at least the \alert{basic exception safety guarantee}, or they must never catch the exception and be happy with the program terminating as a result.
+\end{quotation}
+
+\tiny{\verb|https://google.github.io/styleguide/cppguide.html#Exceptions|}
+\end{frame}
+
+\begin{frame}[fragile]{Exception Safety}
+There are in general 3 levels of exception safety:
+\begin{description}[No-throw Guarantee]
+	\item[No-throw Guarantee] The function will not throw an exception or \alert{allow one to propagate}. 
+	\item[Strong Guarantee] If a function terminates because of an exception, it will not leak memory and no data will not be modified, as if it has never been called from the beginning.
+	\item[Basic Guarantee] If an exception is thrown, no resource (memory) is leaked ... though the data might have been modified.
+\end{description}
+
+Understand these guarantees as part of the specification for your function. Exceptions allows the function to interact with the outside world (by throwing exceptions) and it requires the outside world to change accordingly (catch exceptions).
+
+\tiny{From MSDN 0\verb|https://msdn.microsoft.com/en-us/library/hh279653.aspx|}
+\end{frame}
+
+\begin{frame}[fragile]{No-throw guarantee}
+No-throw guarantee is very strong guarantee! You might think this is easy. You might thought as long as your function does not throw anything than you are safe. However consider the following example:
+\begin{minted}{c++}
+int g(int); int foo(int i) { return g(i); }
+\end{minted}
+In this example, \texttt{foo} does not give no-throw guarantee. It \texttt{g} could throw an exception so that \texttt{foo} fowards an exception. But can we make \texttt{foo} no-throw?
+
+\vspace{0.1in}
+The only way of doing this is to allow \texttt{foo} to catch everything. But since \texttt{foo} does not have the faintest idea what kinds of exception \texttt{g} might throw (since exception are not part of abstraction specification), it cannot catch them without causing problems. 
+
+\vspace{0.1in}
+In this example it is simply impossible to achieve no-throw guarantee.
+\end{frame}
+
+
+
+\begin{frame}[fragile]{Strong Exception Safety}
+Now we take a step back. What about strong exception safety. At first look it seems strong exception safety is easier to achieve since a function need only to look over it's own stuff. But this is very difficult as well. Consider the following code:
+
+\begin{minted}{c++}
+int divide(IntList& stack) {
+    int num = stack.pop();
+    int denum  = stack.pop();
+    if (denum == 0) throw ExceptionDivZero();
+    return num / denum;
+}
+\end{minted}
+
+At first look you might think this is perfect. But this code is not strong exception safe. This function has side-effect (still remember what are side effects?), and side effects must be reversed before exiting from \texttt{divide}. Unfortunately not all side-effects are reversible (within reasonable performance overhead).
+\end{frame}
+
+\begin{frame}{Basic Exception Safety}
+Now we seek the least. Can we achieve at least basic safety. Well, the good news is we can, but by no means easy! 
+
+Note RAII takes most of the trouble away. If you follow RAII and only explicitly use local objects (so they are destroyed automatically by the compiler) you are already on the safe track. When a exception happens, the compiler performs \textit{stack unrolling} (see page 116 of the slides).
+
+But there is one corner case. We start by asking what happens if a constructor has to report an error.
+\begin{itemize}
+	\item If an construction fails, which indicates the invariance of an object cannot be satisfied, so that an object cannot be valid.
+	\item Constructors do not have return value.
+\end{itemize}
+
+It seems we are cornered, but we do have choices.
+\end{frame}
+
+\begin{frame}{Error handling in constructors}
+One way of handling this is to create a "dummy" object, a tombstone. This is used in \texttt{fstream} in standard library. If you construct a file string with a invalid file, you would have a \texttt{fstream} that is in a failed state. It is not bind to any resource (it owns nothing). You can use a method (\texttt{fstream::is\_good()} in our case) to determine it's state. 
+
+This have the same problem of error code! (What are they?)
+
+\vspace{0.1in}
+Another approach is to throw an exception in a constructor (yes you can do that!). However, since we are still in the constructor, this indicates the object itself has not been valid (i.e. it does not really exist). When a exception is thrown:
+\begin{itemize}
+	\item Terminate the function and unroll stack as usual.  
+	\item The destructor will NOT be invoked.
+	\item It's members are already valid object, so they will be destructed.
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Exceptions in constructors}
+The rules can easily gets extremely complicated. First of all, since destructor of an object might be called in the process of throwing an exception (the exception is raised, but is not brought to process), it will be extremely bad if another exception is thrown. So that a destructor may not throw any exception.
+
+\vspace{0.1in}
+Secondly we note a few complicated situations.
+\begin{itemize}
+	\item If a member of class throws an exception in the process of initialization, the members that have been initialized will be destroyed.   
+	\item If one of the objects throw an exception in initializing an array of objects obtained by \texttt{new[]}, the objects that already constructed will be destroyed.
+\end{itemize}
+
+And there are more of them. They are so tricky that the only way to safely deal with is to follow RAII strictly. 
+\end{frame}
+
+\begin{frame}[fragile]{Smart Pointers}
+The problem of ownership often comes with pointers. We use pointers for two very different reasons:
+\begin{itemize}
+	\item To signify owner ship.
+	\item To store a reference of an object.
+\end{itemize}
+\begin{minted}{c++}
+Type* getNewObject(int param) {
+    Type* obj = new Type; /* Calculation */ return obj;
+}
+\end{minted}
+Above code essentially transfer the ownership of the new object to it's caller. The caller must be aware that it is accepting an ownership, thus it should be in charge of releasing it. 
+
+\vspace{0.05in}
+Further more it could happen an object is shared among multiple modules. The ownership is not clear, and we might not know which module finishes using it last. 
+\end{frame}
+
+\begin{frame}[fragile]{Smart Pointers}
+The standard library features 3 smart pointers:
+\begin{minted}{c++}
+std::unique_ptr<Type> ptr;   // Unique ownership
+std::shared_ptr<Type> s_ptr; // Shared ownership
+std::weak_ptr<Type> s_ptr;   // No Ownership
+\end{minted} 
+Unique pointer features a complete ownership. This pointer cannont be duplicated by copying. It can only be transfered through \texttt{move}.
+
+Shared pointer indicates shared ownership. Multiple owner ``shares" the object. Reference counting it used to indicate how many instances is using the object. When reference counting goes to zero, the object is released.
+
+Weak pointer indicates no ownership at all. Smart pointers supports syntax just like pointers. For more information RTFM. 
 \end{frame}
